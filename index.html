@@ -178,8 +178,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;mi
 
 <script>
 /* ===== Настройки ===== */
-const CHAT_ID = "1198264729";          // твой Telegram chat_id
-const BOT = "ODYzMTM0NzEzOTpBQUZFTHBmOFV0MTZDOVpWWTZzYlBKdzh4NGVhWmtuSFJ0VQ==";             // токен бота (в base64, чтобы не светился в коде открытым текстом)
+// Токена здесь нет: отправку делает серверная функция Netlify (/api/send),
+// токен и chat_id хранятся в переменных окружения BOT_TOKEN и CHAT_ID.
 const SASHA_TG = "tyt_mslv";           // запасной вариант, если отправка не прошла
 
 const $ = s => document.querySelector(s);
@@ -253,20 +253,21 @@ function ask(options, customIndex=-1, inputType="text"){
 async function run(){
   await wait(200);$("#sasha").classList.add("in");
   await wait(600);
-  await say("Привет! 👋 Свободен сегодня?");
+  await say("Привет! 👋 Свободен завтра?");
   $("#zhenya").classList.add("in");await wait(700);
 
   const a=await ask(["Да 💚","Я ещё не доел арбуз 🍉","Давай в другой день 📅"]);
-  log.push(["Свободен сегодня?",a]);
+  log.push(["Свободен завтра?",a]);
 
   // дата всегда считается от момента, когда Женя открыл сайт
   const today=new Date();today.setHours(0,0,0,0);
   const fmt=d=>d.toLocaleDateString("ru-RU",{weekday:"short",day:"numeric",month:"long"});
-  let date=today, whenWord="сегодня";
+  const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
+  let date=tomorrow, whenWord="завтра";
 
-  async function pickDate(fromToday){
+  async function pickDate(start){
     const days=[];
-    for(let i=fromToday?0:1;i<=(fromToday?4:5);i++){const d=new Date(today);d.setDate(d.getDate()+i);days.push(d);}
+    for(let i=start;i<start+5;i++){const d=new Date(today);d.setDate(d.getDate()+i);days.push(d);}
     const labels=days.map(d=>{const off=Math.round((d-today)/864e5);
       return off===0?"Сегодня, "+fmt(d):off===1?"Завтра, "+fmt(d):fmt(d);});
     const pick=await ask([...labels,"Другая дата 🗓"],labels.length,"date");
@@ -278,25 +279,25 @@ async function run(){
     await say("Давай помогу 🍉😄",900);
     await wait(1300);
     await say("А как доедим — когда увидимся? 📅",900);
-    date=await pickDate(true);
-    whenWord=date.getTime()===today.getTime()?"сегодня":fmt(date);
+    date=await pickDate(1);
+    whenWord=fmt(date);
     await say("Супер! Куда пойдём?",800);
   }else if(a.startsWith("Давай в другой")){
     await say("Договор! Жду встречи 💚",900);
     await wait(1100);
     await say("Когда тебе удобно? 📅",800);
-    date=await pickDate(false);
+    date=await pickDate(2);
     whenWord=fmt(date);
     await say("Супер! Куда пойдём?",800);
   }else{
     await say("Ура! 🥳 Куда пойдём?");
   }
-  log.push(["Дата",fmt(date)+(date.getTime()===today.getTime()?" (сегодня)":"")]);
+  log.push(["Дата",fmt(date)+(date.getTime()===tomorrow.getTime()?" (завтра)":"")]);
 
   const p=await ask(["Прогулка 🌿","Ужин в ресторане 🍷","Свой вариант ✍️"],2);
   log.push(["Куда идём?",p]);
 
-  await say("Отлично! А во сколько"+(whenWord==="сегодня"?" сегодня":"")+"? 🕰",900);
+  await say("Отлично! А во сколько"+(whenWord==="завтра"?" завтра":"")+"? 🕰",900);
   const tm=await ask(["18:00","19:00","20:00","Другое время ⏰"],3,"time");
   log.push(["Во сколько?",tm.replace("✍️ ","")]);
 
@@ -327,10 +328,9 @@ function message(){
 async function send(){
   const text=message();
   try{
-    const token=atob(BOT);
-    const r=await fetch("https://api.telegram.org/bot"+token+"/sendMessage",{
+    const r=await fetch("/api/send",{
       method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({chat_id:CHAT_ID,text})
+      body:JSON.stringify({text})
     });
     const d=await r.json();
     if(!d.ok)throw new Error(d.description);
