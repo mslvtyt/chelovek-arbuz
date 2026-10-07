@@ -264,20 +264,28 @@ async function run(){
   const fmt=d=>d.toLocaleDateString("ru-RU",{weekday:"short",day:"numeric",month:"long"});
   let date=today, whenWord="сегодня";
 
+  async function pickDate(fromToday){
+    const days=[];
+    for(let i=fromToday?0:1;i<=(fromToday?4:5);i++){const d=new Date(today);d.setDate(d.getDate()+i);days.push(d);}
+    const labels=days.map(d=>{const off=Math.round((d-today)/864e5);
+      return off===0?"Сегодня, "+fmt(d):off===1?"Завтра, "+fmt(d):fmt(d);});
+    const pick=await ask([...labels,"Другая дата 🗓"],labels.length,"date");
+    if(pick.startsWith("✍️ ")){const [y,m,dd]=pick.slice(3).split("-").map(Number);return new Date(y,m-1,dd);}
+    return days[labels.indexOf(pick)];
+  }
+
   if(a.startsWith("Я ещё")){
     await say("Давай помогу 🍉😄",900);
     await wait(1300);
-    await say("А после арбуза — куда пойдём?",900);
+    await say("А как доедим — когда увидимся? 📅",900);
+    date=await pickDate(true);
+    whenWord=date.getTime()===today.getTime()?"сегодня":fmt(date);
+    await say("Супер! Куда пойдём?",800);
   }else if(a.startsWith("Давай в другой")){
     await say("Договор! Жду встречи 💚",900);
     await wait(1100);
     await say("Когда тебе удобно? 📅",800);
-    const days=[];
-    for(let i=1;i<=5;i++){const d=new Date(today);d.setDate(d.getDate()+i);days.push(d);}
-    const labels=days.map((d,i)=>i===0?"Завтра, "+fmt(d):fmt(d));
-    const pick=await ask([...labels,"Другая дата 🗓"],labels.length,"date");
-    if(pick.startsWith("✍️ ")){const [y,m,dd]=pick.slice(3).split("-").map(Number);date=new Date(y,m-1,dd);}
-    else date=days[labels.indexOf(pick)];
+    date=await pickDate(false);
     whenWord=fmt(date);
     await say("Супер! Куда пойдём?",800);
   }else{
